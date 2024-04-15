@@ -5,12 +5,14 @@
 #include <stdio.h>
 #include <errno.h>
 
+#define CTRL_KEY(k) ((k) & 0x1f)
+
 struct termios orig_termios;
 
 //exit the program whenever an error occurs
 void die(const char *s){
 	perror(s);
-	exit(0);
+	exit(1);
 }
 
 //Restore terminal attributes
@@ -39,14 +41,14 @@ int main() {
 
   while (1) {
     char c = '\0';
-    if(read(STDIN_FILENO, &c, 1)==-1 && errno != EAGAIN) die("read"); 
+    if(read(STDIN_FILENO, &c, 1)==-1 && errno != EAGAIN) die("read");  
 
     if (iscntrl(c))
       printf("%d\r\n", c);
-    else 
-      printf("%d ('%c')\r\n", c, c);
+    else
+      	printf("%d ('%c')\r\n", c, c);
 
-    if (c == 'q') break;
+    if (c == CTRL_KEY('q')) break;
   }
   return 0;
 }
