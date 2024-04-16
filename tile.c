@@ -4,10 +4,18 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <errno.h>
+#include <sys/ioctl.h>
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 
-struct termios orig_termios;
+struct editorConfig{
+	struct termios orig_termios;
+	int screenrows;
+	int screencols;
+};
+
+struct editorConfig E;
+
 
 //exit the program whenever an error occurs
 void die(const char *s){
@@ -19,15 +27,15 @@ void die(const char *s){
 
 //Restore terminal attributes
 void disableRawMode(){
-	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios)==-1)
+	if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios)==-1)
 		die("tcsetattr");
 }
 
 //RawMode: the terminal send each character it gets in it to the computer (computer keeps track of your moves <:) )
 void enableRawMode(){
-	if(tcgetattr(STDIN_FILENO, &orig_termios)==-1) die("tcgetattr");
+	if(tcgetattr(STDIN_FILENO, &E.orig_termios)==-1) die("tcgetattr");
 	atexit(disableRawMode);
-	struct termios raw = orig_termios;
+	struct termios raw = E.orig_termios;
 	raw.c_iflag &= ~(BRKINT | INPCK | ISTRIP |IXON | ICRNL); //cntrl+s & cntrl+q //ICRNL: cntrl+m & Enter
 	raw.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN); //ISIG: cntrl+c & cntrl+z //IEXTEN: cntrl+o & ctrl+v 
 	raw.c_cflag |= ~(CS8);
@@ -59,7 +67,7 @@ void editorProcessKeypress(){
 
 void editorDrawRows(){
 	int y;
-	for(y=0;y<24;y++){
+	for(y=0;y<E.screenrows;y++){
 		write(STDOUT_FILENO,"~\r\n",3);
 	}
 }
@@ -72,9 +80,25 @@ void editorRefreshScreen(){
 }
 
 
+int getWindowSize(int *rows, int *cols){
+	struct winsize ws;
+	if(((ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws))==-1) | (ws.ws_col == 0))
+		return -1;
+	else{
+		*cols = ws.ws_col;
+		*rows = ws.ws_row;
+		return 0;
+	}
+}
+
+void initEditor(){
+	if(getWindowSize(&E.screenrows, &E.screencols)==-1) die("getWindowSize");
+}
+
 
 int main() {
   enableRawMode();
+  initEditor();
 
   while (1) {
   	editorRefreshScreen();
