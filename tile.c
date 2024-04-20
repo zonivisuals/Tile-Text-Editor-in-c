@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <sys/ioctl.h>
+#include <string.h>
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 
@@ -16,6 +17,25 @@ struct editorConfig{
 
 struct editorConfig E;
 
+struct abuf{
+	char *data;
+	int len;
+};
+
+#define ABUF_INIT {NULL,0};
+
+void abAppend(struct abuf *ab, const char *s, int len){
+	char *new = realloc(ab->data, ab->len + len);
+	if (!new) return;
+	//update the buff
+	memcpy(&new[ab->len],s,len);/*[ab->len]behaves like offset to add the new data to the old one*/
+	ab->data = new;
+	ab->len += len;
+}
+
+void freeAb(struct abuf *ab){
+	free(ab->data);
+}
 
 //exit the program whenever an error occurs
 void die(const char *s){
@@ -65,20 +85,25 @@ void editorProcessKeypress(){
 	}
 }
 
-void editorDrawRows(){
+void editorDrawRows(struct abuf *ab){
 	int y;
 	for(y=0;y<E.screenrows;y++){
-		write(STDOUT_FILENO,"~",1);
+		abAppend(ab,"~",1);
 		if(y < E.screenrows -1)
-			write(STDOUT_FILENO, "\r\n",2);
+			abAppend(ab, "\r\n",2);
 	}	
 }
 
 void editorRefreshScreen(){
-	write(STDOUT_FILENO, "\x1b[2J", 4);
-	write(STDOUT_FILENO,"\x1b[H",3); //reposition the cursor at top-left corner
-	editorDrawRows();
-	write(STDOUT_FILENO,"\x1b[H",3);
+	struct abuf ab = ABUF_INIT;
+	
+	abAppend(&ab, "\x1b[2J", 4);
+	abAppend(&ab,"\x1b[H",3); //reposition the cursor at top-left corner
+	editorDrawRows(&ab);
+	abAppend(&ab,"\x1b[H",3);
+	
+	write(STDOUT_FILENO, ab.data, ab.len);
+  	freeAb(&ab);
 }
 
 
