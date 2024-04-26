@@ -8,6 +8,7 @@
 #include <string.h>
 
 #define CTRL_KEY(k) ((k) & 0x1f)
+#define tile_version "0.0.1"
 
 struct editorConfig{
 	struct termios orig_termios;
@@ -88,7 +89,15 @@ void editorProcessKeypress(){
 void editorDrawRows(struct abuf *ab){
 	int y;
 	for(y=0;y<E.screenrows;y++){
-		abAppend(ab,"~",1);
+		if(y == E.screenrows/3){
+			char welcome[80];
+			//abAppend(ab,welcome,80);
+			int welcomelen = snprintf(welcome, sizeof(welcome), "WELCOME -- TILE VERSION %s --",tile_version);
+			if(welcomelen > E.screencols) welcomelen = E.screencols;
+			abAppend(ab,welcome,welcomelen);
+		}
+		else
+			abAppend(ab,"~",1);
 	abAppend(ab,"\x1b[K",3);
 		if(y < E.screenrows -1)
 			abAppend(ab, "\r\n",2);
