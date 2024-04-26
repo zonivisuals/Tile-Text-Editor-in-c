@@ -94,24 +94,19 @@ void editorDrawRows(struct abuf *ab){
 			char copyright[50];
 			int welcomelen = snprintf(welcome, sizeof(welcome), "WELCOME TO TILE VERSION -- %s\n\r",TILE_VERSION);
 			int copyrightlen = snprintf(copyright,sizeof(copyright),"BUILT BY ZONI");
+			
 			if(welcomelen > E.screencols) welcomelen = E.screencols;
 			if(copyrightlen > E.screencols) copyrightlen = E.screencols;
-			int padding = (E.screencols - welcomelen) / 2;
-			if(padding){
-				abAppend(ab,"~",1);
-				padding--;
-			}
-			while(padding--) abAppend(ab," ",1);
+			int colPadding = (E.screencols - welcomelen) / 2;
+
+			while(colPadding--) abAppend(ab," ",1);
 			abAppend(ab,welcome,welcomelen);
-			padding = (E.screencols - copyrightlen) / 2;
-			while(padding--) abAppend(ab," ",1);
+			colPadding = (E.screencols - copyrightlen) / 2;
+			while(colPadding--) abAppend(ab," ",1);
 			abAppend(ab,copyright,copyrightlen);
 		}
-		else
-			abAppend(ab,"~",1);
-	abAppend(ab,"\x1b[K",3);
-		if(y < E.screenrows -1)
-			abAppend(ab, "\r\n",2);
+		abAppend(ab,"\x1b[K",3);
+		if(y < E.screenrows -1) abAppend(ab, "\r\n",2);
 	}	
 }
 
