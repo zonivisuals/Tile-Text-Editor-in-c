@@ -11,6 +11,7 @@
 #define TILE_VERSION "0.0.1"
 
 struct editorConfig{
+	int cx,cy;
 	struct termios orig_termios;
 	int screenrows;
 	int screencols;
@@ -75,6 +76,23 @@ char editorReadKey(){
 	return c;
 }
 
+void editorMoveCursor(char key){
+	switch(key){
+		case 'z':
+			E.cx--;
+			break;
+		case 'q':
+			E.cy--;
+			break;
+		case 'd':
+			E.cy++;
+			break;
+		case 's':
+			E.cx++;
+			break;
+	}
+}
+
 void editorProcessKeypress(){
 	char c = editorReadKey();
 	switch (c){
@@ -82,6 +100,12 @@ void editorProcessKeypress(){
 			write(STDOUT_FILENO, "\x1b[2J", 4);
 			write(STDOUT_FILENO,"\x1b[H",3);
 			exit(0);
+			break;
+		case 'z':
+		case 'q':
+		case 'd':
+		case 's':
+			editorMoveCursor(c);
 			break;
 	}
 }
@@ -118,7 +142,11 @@ void editorRefreshScreen(){
 	
 	editorDrawRows(&ab);
 	
-	abAppend(&ab,"\x1b[H",3);
+	char buf[50];
+	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cx+1,E.cy+1);
+	abAppend(&ab,buf,strlen(buf));
+
+
 	abAppend(&ab,"\x1b[?25h",6);
 
 	write(STDOUT_FILENO, ab.data, ab.len);
@@ -159,8 +187,12 @@ int getWindowSize(int *rows, int *cols){
 }
 
 void initEditor(){
+	E.cx = 0;
+	E.cy = 0;
 	if(getWindowSize(&E.screenrows, &E.screencols)==-1) die("getWindowSize");
 }
+
+
 
 
 int main() {
