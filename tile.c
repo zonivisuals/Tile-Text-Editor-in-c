@@ -8,7 +8,7 @@
 #include <string.h>
 
 #define CTRL_KEY(k) ((k) & 0x1f)
-#define tile_version "0.0.1"
+#define TILE_VERSION "0.0.1"
 
 struct editorConfig{
 	struct termios orig_termios;
@@ -91,10 +91,21 @@ void editorDrawRows(struct abuf *ab){
 	for(y=0;y<E.screenrows;y++){
 		if(y == E.screenrows/3){
 			char welcome[80];
-			//abAppend(ab,welcome,80);
-			int welcomelen = snprintf(welcome, sizeof(welcome), "WELCOME -- TILE VERSION %s --",tile_version);
+			char copyright[50];
+			int welcomelen = snprintf(welcome, sizeof(welcome), "WELCOME TO TILE VERSION -- %s\n\r",TILE_VERSION);
+			int copyrightlen = snprintf(copyright,sizeof(copyright),"BUILT BY ZONI");
 			if(welcomelen > E.screencols) welcomelen = E.screencols;
+			if(copyrightlen > E.screencols) copyrightlen = E.screencols;
+			int padding = (E.screencols - welcomelen) / 2;
+			if(padding){
+				abAppend(ab,"~",1);
+				padding--;
+			}
+			while(padding--) abAppend(ab," ",1);
 			abAppend(ab,welcome,welcomelen);
+			padding = (E.screencols - copyrightlen) / 2;
+			while(padding--) abAppend(ab," ",1);
+			abAppend(ab,copyright,copyrightlen);
 		}
 		else
 			abAppend(ab,"~",1);
