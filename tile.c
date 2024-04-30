@@ -1,11 +1,11 @@
 #include <unistd.h>
-#include <termios.h>
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <errno.h>
-#include <sys/ioctl.h>
 #include <string.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define TILE_VERSION "0.0.1"
@@ -15,7 +15,6 @@ enum editorKey{
 	ARROW_UP,
 	ARROW_RIGHT,
 	ARROW_DOWN,
-	DEL_KEY,
 	HOME_KEY,
 	END_KEY,
 	PAGE_UP,
@@ -67,7 +66,7 @@ void disableRawMode(){
 
 //RawMode: the terminal send each character it gets in it to the computer (computer keeps track of your moves <:) )
 void enableRawMode(){
-	if(tcgetattr(STDIN_FILENO, &E.orig_termios)==-1) die("tcgetattr");
+	if(tcgetattr(STDIN_FILENO, &E.orig_termios)==-1)die("tcgetattr");
 	atexit(disableRawMode);
 	struct termios raw = E.orig_termios;
 	raw.c_iflag &= ~(BRKINT | INPCK | ISTRIP |IXON | ICRNL); //cntrl+s & cntrl+q //ICRNL: cntrl+m & Enter
@@ -99,8 +98,6 @@ int editorReadKey(){
 						case '1':
 						case '7':
 							return HOME_KEY;
-						case '3':
-							return DEL_KEY;
 						case '4':
 						case '8':
 							return END_KEY;
@@ -186,7 +183,7 @@ void editorProcessKeypress(){
 	}
 }
 
-void editorDrawRows(struct abuf *ab){
+void editorWriteWelcomeMsg(struct abuf *ab){
 	int y;
 	for(y=0;y<E.screenrows;y++){
 		if(y == E.screenrows/3){
@@ -195,7 +192,7 @@ void editorDrawRows(struct abuf *ab){
 			int welcomelen = snprintf(welcome, sizeof(welcome), "WELCOME TO TILE VERSION -- %s\n\r",TILE_VERSION);
 			int copyrightlen = snprintf(copyright,sizeof(copyright),"BUILT BY ZONI");
 			
-			if(welcomelen > E.screencols) welcomelen = E.screencols;
+			if(welcomelen > E.screencols) welcomelen =E.screencols;
 			if(copyrightlen > E.screencols) copyrightlen = E.screencols;
 			int colPadding = (E.screencols - welcomelen) / 2;
 
@@ -214,9 +211,9 @@ void editorRefreshScreen(){
 	struct abuf ab = ABUF_INIT;
 	
 	abAppend(&ab,"\x1b[?25l",6);
-	abAppend(&ab,"\x1b[H",3); //reposition the cursor at top-left corner
+	//abAppend(&ab,"\x1b[H",3); //reposition the cursor at top-left corner
 	
-	editorDrawRows(&ab);
+	editorWriteWelcomeMsg(&ab);
 	
 	char buf[50];
 	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,E.cx+1);
