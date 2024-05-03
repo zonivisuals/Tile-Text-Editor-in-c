@@ -41,6 +41,7 @@ struct editorConfig{
 	struct termios orig_termios;
 	int screenrows;
 	int screencols;
+	int rowoff;
 	erow *row;
 	int numRows;
 };
@@ -151,21 +152,29 @@ int editorReadKey(){
 	else return c;
 }
 
-void editorMoveCursor(int key){
-	switch(key){
-		case ARROW_UP:
-			if(E.cy>0) E.cy--;	
-			break;
-		case ARROW_LEFT:
-			if(E.cx>0) E.cx--;
-			break;
-		case ARROW_RIGHT:
-			if(E.cx<E.screencols-1) E.cx++;
-			break;
-		case ARROW_DOWN:
-			if(E.cy<E.screenrows-1) E.cy++;
-			break;
-	}
+void editorMoveCursor(int key) {
+  switch (key) {
+    case ARROW_LEFT:
+      if (E.cx != 0) {
+        E.cx--;
+      }
+      break;
+    case ARROW_RIGHT:
+      if (E.cx != E.screencols - 1) {
+        E.cx++;
+      }
+      break;
+    case ARROW_UP:
+      if (E.cy != 0) {
+        E.cy--;
+      }
+      break;
+    case ARROW_DOWN:
+      if (E.cy < E.numRows) {
+        E.cy++;
+      }
+      break;
+  }
 }
 
 void editorProcessKeypress(){
@@ -202,13 +211,17 @@ void editorProcessKeypress(){
 	}
 }
 
-
-
+void editorScroll(){
+	if(E.cy < E.rowoff) E.rowoff = E.cy;
+	if(E.cy >= E.rowoff + E.screenrows) E.rowoff = E.cy - E.screenrows + 1;
+}
 
 void editorDrawRows(struct abuf *ab) {
   int y;
+  int filerow;
   for (y = 0; y < E.screenrows; y++) {
-    if (y >= E.numRows) {
+	filerow = y + E.rowoff;
+    if (filerow >= E.numRows) {
       if (E.numRows == 0 && y == E.screenrows / 3) {
         char welcome[80];
         int welcomelen = snprintf(welcome, sizeof(welcome),
@@ -226,9 +239,9 @@ void editorDrawRows(struct abuf *ab) {
         abAppend(ab, "~", 1);
       }
     } else {
-      int len = E.row[y].size;
+      int len = E.row[filerow].size;
       if (len > E.screencols) len = E.screencols;
-      abAppend(ab, E.row[y].chars, len);
+      abAppend(ab, E.row[filerow].chars, len);
     }
     abAppend(ab, "\x1b[K", 3);
     if (y < E.screenrows - 1) {
@@ -238,6 +251,7 @@ void editorDrawRows(struct abuf *ab) {
 }
 
 void editorRefreshScreen(){
+	editorScroll();
 	struct abuf ab = ABUF_INIT;
 	
 	abAppend(&ab,"\x1b[?25l",6);
@@ -246,7 +260,7 @@ void editorRefreshScreen(){
 	editorDrawRows(&ab);
 	
 	char buf[50];
-	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,E.cx+1);
+	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",(E.cy - E.rowoff)+1,E.cx+1);
 	abAppend(&ab,buf,strlen(buf));
 
 
@@ -322,6 +336,7 @@ void initEditor(){
 	E.cy = 0;
 	E.numRows = 0;
 	E.row = NULL;
+	E.rowoff = 0;
 	if(getWindowSize(&E.screenrows, &E.screencols)==-1) die("getWindowSize");
 }
 
