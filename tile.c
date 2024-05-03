@@ -1,3 +1,4 @@
+/**INCLUDES**/
 #include <unistd.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -6,26 +7,42 @@
 #include <string.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
 
+/**DEFINES*/
+#define ABUF_INIT {NULL,0};
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define TILE_VERSION "0.0.1"
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
 
+
+/**DATA*/
 enum editorKey{
 	ARROW_LEFT = 1000,
 	ARROW_UP,
 	ARROW_RIGHT,
 	ARROW_DOWN,
 	HOME_KEY,
+	DEL_KEY,
 	END_KEY,
 	PAGE_UP,
 	PAGE_DOWN
 };
+
+typedef struct erow{
+	char *chars;
+	int size;
+}erow;
 
 struct editorConfig{
 	int cx,cy;
 	struct termios orig_termios;
 	int screenrows;
 	int screencols;
+	erow row;
+	int numRows;
 };
 
 struct editorConfig E;
@@ -35,8 +52,8 @@ struct abuf{
 	int len;
 };
 
-#define ABUF_INIT {NULL,0};
 
+/**FUNCTIONS*/
 void abAppend(struct abuf *ab, const char *s, int len){
 	char *new = realloc(ab->data, ab->len + len);
 	if (!new) return;
@@ -98,6 +115,8 @@ int editorReadKey(){
 						case '1':
 						case '7':
 							return HOME_KEY;
+						case '3':
+							return DEL_KEY;
 						case '4':
 						case '8':
 							return END_KEY;
@@ -183,28 +202,39 @@ void editorProcessKeypress(){
 	}
 }
 
-void editorWriteWelcomeMsg(struct abuf *ab){
-	int y;
-	for(y=0;y<E.screenrows;y++){
-		if(y == E.screenrows/3){
-			char welcome[80];
-			char copyright[50];
-			int welcomelen = snprintf(welcome, sizeof(welcome), "WELCOME TO TILE VERSION -- %s\n\r",TILE_VERSION);
-			int copyrightlen = snprintf(copyright,sizeof(copyright),"BUILT BY ZONI");
-			
-			if(welcomelen > E.screencols) welcomelen =E.screencols;
-			if(copyrightlen > E.screencols) copyrightlen = E.screencols;
-			int colPadding = (E.screencols - welcomelen) / 2;
 
-			while(colPadding--) abAppend(ab," ",1);
-			abAppend(ab,welcome,welcomelen);
-			colPadding = (E.screencols - copyrightlen) / 2;
-			while(colPadding--) abAppend(ab," ",1);
-			abAppend(ab,copyright,copyrightlen);
-		}
-		abAppend(ab,"\x1b[K",3);
-		if(y < E.screenrows -1) abAppend(ab, "\r\n",2);
-	}	
+
+
+void editorDrawRows(struct abuf *ab) {
+  int y;
+  for (y = 0; y < E.screenrows; y++) {
+    if (y >= E.numRows) {
+      if (E.numRows == 0 && y == E.screenrows / 3) {
+        char welcome[80];
+        int welcomelen = snprintf(welcome, sizeof(welcome),
+          "WELCOME TO TILE VERSION -- %s", TILE_VERSION);
+
+        if (welcomelen > E.screencols) welcomelen = E.screencols;
+        int padding = (E.screencols - welcomelen) / 2;
+        if (padding) {
+          abAppend(ab, "~", 1);
+          padding--;
+        }
+        while (padding--) abAppend(ab, " ", 1);
+        abAppend(ab, welcome, welcomelen);
+      } else {
+        abAppend(ab, "~", 1);
+      }
+    } else {
+      int len = E.row.size;
+      if (len > E.screencols) len = E.screencols;
+      abAppend(ab, E.row.chars, len);
+    }
+    abAppend(ab, "\x1b[K", 3);
+    if (y < E.screenrows - 1) {
+      abAppend(ab, "\r\n", 2);
+    }
+  }
 }
 
 void editorRefreshScreen(){
@@ -213,7 +243,7 @@ void editorRefreshScreen(){
 	abAppend(&ab,"\x1b[?25l",6);
 	//abAppend(&ab,"\x1b[H",3); //reposition the cursor at top-left corner
 	
-	editorWriteWelcomeMsg(&ab);
+	editorDrawRows(&ab);
 	
 	char buf[50];
 	snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,E.cx+1);
@@ -225,7 +255,6 @@ void editorRefreshScreen(){
 	write(STDOUT_FILENO, ab.data, ab.len);
   	freeAb(&ab);
 }
-
 
 int getCusorPosition(int *rows, int *cols){
 	if(write(STDOUT_FILENO, "\x1b[6n",4)!=4) return -1; // query the cursor position
@@ -262,20 +291,45 @@ int getWindowSize(int *rows, int *cols){
 void initEditor(){
 	E.cx = 0;
 	E.cy = 0;
+	E.numRows = 0;
 	if(getWindowSize(&E.screenrows, &E.screencols)==-1) die("getWindowSize");
+}
+
+void editorOpen(char *filename){
+	FILE *fp = fopen(filename, "r");
+	if(!fp)die("fopen");
+
+	char *line = NULL;
+	size_t linecap = 0;
+	ssize_t linelen;
+	linelen = getline(&line, &linecap, fp);
+	if(linelen != -1){
+		while(linelen > 0 && (line[linelen-1]=='\n' || line[linelen -1] == '\r'))
+			linelen --;
+		E.row.size = linelen;
+		E.row.chars = malloc(linelen + 1);
+		memcpy(E.row.chars, line, linelen);
+		E.row.chars[linelen] = '\0';
+		E.numRows = 1;
+	}
+
+	free(line);
+	fclose(fp);
 }
 
 
 
+int main(int argc, char *argv[]) {
+    enableRawMode();
+    initEditor();
+	if(argc >= 2){
+		editorOpen(argv[1]);
+	}
 
-int main() {
-  enableRawMode();
-  initEditor();
-
-  while (1) {
-  	editorRefreshScreen();
-  	editorProcessKeypress();
-  }
-  return 0;
+    while (1) {
+  		editorRefreshScreen();
+  		editorProcessKeypress();
+  	}
+  	return 0;
 }
 	
