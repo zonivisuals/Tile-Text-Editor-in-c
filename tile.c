@@ -33,6 +33,8 @@ enum editorKey{
 
 typedef struct erow{
 	char *chars;
+	char *render;
+	int rsize;
 	int size;
 }erow;
 
@@ -167,6 +169,10 @@ void editorMoveCursor(int key) {
       break;
     case ARROW_RIGHT:
         if(row && E.cx < row->size) E.cx++;
+        else if(row && E.cx == row->size){
+          E.cy++;
+          E.cx = 0;
+        }
       break;
     case ARROW_UP:
       if (E.cy != 0) {
@@ -312,6 +318,17 @@ int getWindowSize(int *rows, int *cols){
 	}
 }
 
+void editorUpdateRow(erow *row){
+	free(row->render);
+	row->render = malloc(row->size + 1);
+	int j, i = 0;
+	for(j = 0;j<row->size;j++){
+		row->render[i++] = row->chars[j];
+	}
+	row->render[i] = '\0';
+	row->size = i;
+}
+
 void editorAppendRow(char *s, size_t len){
 	E.row = realloc(E.row, sizeof(erow)*(E.numRows + 1));
 	int at = E.numRows;
@@ -319,6 +336,10 @@ void editorAppendRow(char *s, size_t len){
 	E.row[at].chars = malloc(len+1);
 	memcpy(E.row[at].chars, s, len);
 	E.row[at].chars[len] = '\0';
+
+	E.row[at].rsize = 0;
+	E.row[at].render = NULL;
+	editorUpdateRow(&E.row[at]);
 	E.numRows ++;
 }
 
